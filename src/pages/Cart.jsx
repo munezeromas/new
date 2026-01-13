@@ -1,7 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useCart } from '../context/CartContext';
-import db from '../utils/db.js';
 import { useAuth } from '../context/AuthContext';
 import confirmToast from '../utils/confirmToast.js';
 
@@ -68,13 +67,17 @@ const Cart = () => {
     orders.push(order);
     localStorage.setItem('orders', JSON.stringify(orders));
 
-    // Log activity
-    db.logActivity({
+    // Log activity to localStorage
+    const activities = JSON.parse(localStorage.getItem('ma_shop_activities') || '[]');
+    activities.unshift({
+      id: `a-${Date.now()}`,
       actor: user.username,
       type: 'checkout',
       message: `User ${user.username} placed an order`,
       details: order,
+      timestamp: new Date().toISOString()
     });
+    localStorage.setItem('ma_shop_activities', JSON.stringify(activities));
 
     clearCart();
     toast.success('🎉 Order placed successfully!');

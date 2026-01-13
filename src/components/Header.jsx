@@ -3,8 +3,7 @@ import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { useWishlist } from '../context/WishlistContext';
-import SearchBar from './SearchBar';
-import db from '../utils/db';
+import SearchBar from './Searchbar';
 
 const Header = () => {
   const { user, logout } = useAuth();
@@ -13,7 +12,6 @@ const Header = () => {
   const navigate = useNavigate();
 
   const handleSearch = (query) => {
-    // Search will be handled by Home component via URL params
     navigate(`/?search=${encodeURIComponent(query)}`);
   };
 
@@ -23,7 +21,8 @@ const Header = () => {
     navigate('/');
   };
 
-  const avatarUrl = user ? (user.avatar || db.getAvatarUrl(user.username)) : null;
+  // Use user image from API or fallback to UI avatars
+  const avatarUrl = user?.image || `https://ui-avatars.com/api/?name=${user?.firstName}+${user?.lastName}&background=4f46e5&color=fff`;
 
   return (
     <header className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-50">
@@ -42,7 +41,6 @@ const Header = () => {
           <nav className="hidden md:flex items-center space-x-8">
             <Link to="/" className="text-gray-700 hover:text-primary-600 font-medium transition-colors">Shop</Link>
             <Link to="/categories" className="text-gray-700 hover:text-primary-600 font-medium transition-colors">Categories</Link>
-            {/* Only show admin dashboard link to admin users */}
             {user && user.role === 'admin' && (
               <Link to="/admin" className="text-gray-700 hover:text-primary-600 font-medium transition-colors">Dashboard</Link>
             )}

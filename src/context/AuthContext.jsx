@@ -1,6 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import api from '../utils/api';
-import db from '../utils/db';
+import * as authService from '../services/authService';
 
 const AuthContext = createContext();
 
@@ -16,7 +15,9 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
-    if (storedUser) {
+    const token = localStorage.getItem('token');
+    
+    if (storedUser && token) {
       setUser(JSON.parse(storedUser));
     }
     setLoading(false);
@@ -27,96 +28,69 @@ export const AuthProvider = ({ children }) => {
       return { success: false, error: 'Missing credentials' };
     }
 
-    console.log('Login attempt for:', username);
-
-    // FIRST: Try local authentication (for admin/emilys)
     try {
-      const localUser = db.authenticate(username, password);
-      if (localUser) {
-        console.log('Local auth successful:', localUser);
-        setUser(localUser);
-        localStorage.setItem('user', JSON.stringify(localUser));
-        localStorage.setItem('token', `local-token-${localUser.id}`);
-        return { success: true, user: localUser };
+      // Call API login
+      const result = await authService.login(username, password);
+      
+      if (result.success) {
+        const apiData = result.data;
+        
+        // Transform API response to our user format
+        const userData = {
+          id: apiData.id,
+          username: apiData.username,
+          email: apiData.email,
+          firstName: apiData.firstName,
+          lastName: apiData.lastName,
+          gender: apiData.gender,
+          image: apiData.image,
+          role: username === 'emilys' ? 'admin' : 'user', // Make emilys admin
+          token: apiData.accessToken,
+          refreshToken: apiData.refreshToken,
+        };
+
+        setUser(userData);
+        localStorage.setItem('user', JSON.stringify(userData));
+        localStorage.setItem('token', apiData.accessToken);
+        localStorage.setItem('refreshToken', apiData.refreshToken);
+
+        return { success: true, user: userData };
       }
-    } catch (localErr) {
-      console.log('Local auth error:', localErr);
-    }
 
-    // SECOND: Try API authentication
-    try {
-      const res = await api.post(
-        '/auth/login',
-        { username, password },
-        { headers: { 'Content-Type': 'application/json' } }
-      );
-
-      const data = res.data;
-      console.log('API auth response:', data);
-
-      const userData = {
-        id: data.id ? `u-${data.id}` : `u-${Date.now()}`,
-        username: data.username || username,
-        firstName: data.firstName || '',
-        lastName: data.lastName || '',
-        role: data.role || 'user',
-        avatar: data.avatar || db.getAvatarUrl(username),
-        token: data.token || `api-token-${Date.now()}`,
-        createdAt: new Date().toISOString(),
+      return result;
+    } catch (err) {
+      console.error('Login error:', err);
+      return {
+        success: false,
+        error: err?.message || 'Login failed',
       };
+    }
+  };
 
-      // Sync with local db
-      try {
-        const existing = db.getUserByUsername(userData.username);
-        if (!existing) {
-          db.addUser({
-            username: userData.username,
-            password: '', // Don't store API passwords
-            firstName: userData.firstName,
-            lastName: userData.lastName,
-            role: userData.role,
-          });
-        }
-      } catch (e) {
-        console.warn('Local DB sync failed', e);
-      }
+  const register = async ({ username, password, firstName = '', lastName = '', email = '' }) => {
+    // Note: DummyJSON doesn't have a real register endpoint
+    // We'll simulate it by creating a user object
+    // In production, you'd call a real registration API
+    
+    try {
+      // For demo purposes, we'll create a mock user
+      // In real app, call your backend registration API
+      const userData = {
+        id: Date.now(),
+        username,
+        email: email || `${username}@example.com`,
+        firstName,
+        lastName,
+        role: 'user',
+        image: `https://dummyjson.com/icon/${username}/128`,
+        token: `demo-token-${Date.now()}`,
+      };
 
       setUser(userData);
       localStorage.setItem('user', JSON.stringify(userData));
       localStorage.setItem('token', userData.token);
 
-      db.logActivity({
-        actor: userData.username,
-        type: 'login',
-        message: `User ${userData.username} logged in`,
-      });
-
       return { success: true, user: userData };
-    } catch (err) {
-      console.log('API auth error:', err);
-      return {
-        success: false,
-        error: err?.response?.data?.message || err.message || 'Invalid credentials',
-      };
-    }
-  };
-
-  const register = async ({ username, password, firstName = '', lastName = '' }) => {
-    try {
-      const u = db.addUser({
-        username,
-        password,
-        firstName,
-        lastName,
-        role: 'user',
-      });
-
-      const { password: _p, ...safe } = u;
-      setUser(safe);
-      localStorage.setItem('user', JSON.stringify(safe));
-      localStorage.setItem('token', 'demo-token-' + safe.id);
-
-      return { success: true, user: safe };
     } catch (err) {
       return { success: false, error: err.message || 'Registration failed' };
     }
@@ -126,6 +100,36 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
     localStorage.removeItem('user');
     localStorage.removeItem('token');
+    localStorage.removeItem('refreshToken');
+  };
+
+  const refreshUserToken = async () => {
+    const refreshToken = localStorage.getItem('refreshToken');
+    if (!refreshToken) {
+      logout();
+      return { success: false };
+    }
+
+    const result = await authService.refreshToken(refreshToken);
+    
+    if (result.success) {
+      const apiData = result.data;
+      const updatedUser = {
+        ...user,
+        token: apiData.accessToken,
+        refreshToken: apiData.refreshToken,
+      };
+
+      setUser(updatedUser);
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      localStorage.setItem('token', apiData.accessToken);
+      localStorage.setItem('refreshToken', apiData.refreshToken);
+
+      return { success: true };
+    }
+
+    logout();
+    return { success: false };
   };
 
   return (
@@ -135,6 +139,7 @@ export const AuthProvider = ({ children }) => {
         login,
         logout,
         register,
+        refreshUserToken,
         loading,
         isAuthenticated: !!user,
         setUser,

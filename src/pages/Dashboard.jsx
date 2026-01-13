@@ -1,7 +1,16 @@
 import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
-import db from '../utils/db';
 import { useAuth } from '../context/AuthContext';
+
+// Helper function to get activities from localStorage
+const getActivities = () => {
+  try {
+    const raw = localStorage.getItem('ma_shop_activities');
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+};
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -14,8 +23,7 @@ const Dashboard = () => {
 
   const loadActivities = () => {
     try {
-      const acts = db.getActivities();
-
+      const acts = getActivities();
       const userActivities = acts.filter(a => a.actor === user?.username);
       setActivities(userActivities.slice(0, 10)); 
     } catch (error) {
@@ -32,9 +40,9 @@ const Dashboard = () => {
         {/* Welcome Header */}
         <div className="mb-8">
           <div className="flex items-center gap-4 mb-4">
-            {user?.avatar && (
+            {user?.image && (
               <img
-                src={user.avatar}
+                src={user.image}
                 alt={user.username}
                 className="w-20 h-20 rounded-full border-4 border-white shadow-lg"
               />

@@ -1,5 +1,14 @@
 import { useState, useEffect } from 'react';
-import db from '../../utils/db';
+
+// Helper function to get activities from localStorage
+const getActivities = () => {
+  try {
+    const raw = localStorage.getItem('ma_shop_activities');
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+};
 
 const ActivityLog = () => {
   const [activities, setActivities] = useState([]);
@@ -11,7 +20,7 @@ const ActivityLog = () => {
 
   const loadActivities = () => {
     try {
-      const logs = db.getActivities();
+      const logs = getActivities();
       setActivities(logs);
     } catch (error) {
       console.error('Failed to load activities:', error);

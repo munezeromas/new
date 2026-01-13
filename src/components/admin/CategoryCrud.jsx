@@ -1,137 +1,83 @@
 import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
-import db from '../../utils/db';
-import confirmToast from '../../utils/confirmToast';
+import * as categoryService from '../../services/categoryService';
 
 const CategoryCrud = () => {
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [editingId, setEditingId] = useState(null);
-  const [formData, setFormData] = useState({ name: '' });
 
   useEffect(() => {
     loadCategories();
   }, []);
 
-  const loadCategories = () => {
+  const loadCategories = async () => {
+    setLoading(true);
     try {
-      const cats = db.listCategories();
-      setCategories(cats);
+      const result = await categoryService.getAllCategories();
+      
+      if (result.success) {
+        setCategories(result.data || []);
+      } else {
+        toast.error(result.error || 'Failed to load categories');
+      }
     } catch (error) {
       toast.error('Failed to load categories');
       console.error(error);
-    }
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (!formData.name.trim()) {
-      toast.error('Category name is required');
-      return;
-    }
-
-    setLoading(true);
-    try {
-      if (editingId) {
-        db.updateCategory(editingId, { name: formData.name });
-        toast.success('Category updated');
-      } else {
-        db.addCategory({ name: formData.name });
-        toast.success('Category created');
-      }
-      resetForm();
-      loadCategories();
-    } catch (error) {
-      toast.error(error.message || 'Operation failed');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleEdit = (category) => {
-    setEditingId(category.id);
-    setFormData({ name: category.name });
-  };
-
-  const handleDelete = async (category) => {
-    const confirmed = await confirmToast({
-      title: 'Delete Category',
-      description: `Delete "${category.name}"?`,
-      confirmText: 'Delete',
-    });
-
-    if (!confirmed) return;
-
-    try {
-      db.removeCategory(category.id);
-      toast.success('Category deleted');
-      loadCategories();
-    } catch (error) {
-      toast.error('Failed to delete category');
-    }
-  };
-
-  const resetForm = () => {
-    setEditingId(null);
-    setFormData({ name: '' });
-  };
-
   return (
     <div className="space-y-6">
       <div className="card p-6">
-        <h3 className="text-xl font-bold mb-4">{editingId ? 'Edit Category' : 'Create Category'}</h3>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="label">Category Name *</label>
-            <input
-              type="text"
-              className="input-field"
-              value={formData.name}
-              onChange={(e) => setFormData({ name: e.target.value })}
-              placeholder="e.g., Electronics"
-              required
-            />
-          </div>
-          <div className="flex gap-2">
-            <button type="submit" className="btn-primary" disabled={loading}>
-              {loading ? 'Saving...' : editingId ? 'Update' : 'Create'}
-            </button>
-            {editingId && (
-              <button type="button" onClick={resetForm} className="btn-secondary">
-                Cancel
-              </button>
-            )}
-          </div>
-        </form>
-      </div>
+        <div className="mb-6">
+          <h3 className="text-xl font-bold text-primary-700 mb-2">Product Categories</h3>
+          <p className="text-sm text-gray-600">
+            Categories are fetched from the DummyJSON API and are read-only.
+          </p>
+        </div>
 
-      <div className="card p-6">
-        <h3 className="text-xl font-bold mb-4">Categories</h3>
-        {categories.length === 0 ? (
+        {loading ? (
+          <div className="flex justify-center py-8">
+            <div className="loading-spinner"></div>
+          </div>
+        ) : categories.length === 0 ? (
           <p className="text-gray-500 text-center py-8">No categories found</p>
         ) : (
-          <div className="space-y-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {categories.map((category) => (
-              <div key={category.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                <span className="font-medium">{category.name}</span>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => handleEdit(category)}
-                    className="text-primary-600 hover:text-primary-800 font-medium text-sm"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => handleDelete(category)}
-                    className="text-red-600 hover:text-red-800 font-medium text-sm"
-                  >
-                    Delete
-                  </button>
+              <div
+                key={category.slug}
+                className="p-4 bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg border border-gray-200 hover:shadow-md transition-shadow"
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-semibold text-gray-900 capitalize">{category.name}</h4>
+                    <p className="text-xs text-gray-500 mt-1">Slug: {category.slug}</p>
+                  </div>
+                  <div className="w-10 h-10 bg-primary-100 rounded-full flex items-center justify-center">
+                    <svg className="w-5 h-5 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                    </svg>
+                  </div>
                 </div>
               </div>
             ))}
           </div>
         )}
+
+        <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex items-start gap-3">
+            <svg className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <div className="text-sm text-blue-800">
+              <p className="font-semibold mb-1">API Information</p>
+              <p>Categories are managed by DummyJSON API. You can view all available categories here, but cannot modify them directly.</p>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
